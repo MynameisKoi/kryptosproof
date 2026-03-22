@@ -4,28 +4,53 @@ services:
   # Deliberately vulnerable web app — red team target
   dvwa:
     image: vulnerables/web-dvwa
-    ports:
-      - "8080:80"
     networks:
       - sandbox
     environment:
       - RECAPTCHA_PRIV_KEY=
       - RECAPTCHA_PUB_KEY=
 
-  # Main kryptosproof platform
+  # KryptosProof backend API
   kryptosproof:
     build:
       context: .
-      dockerfile: dockerfile
+      dockerfile: Dockerfile
     depends_on:
       - dvwa
     networks:
       - sandbox
-    environment:
-      - TARGET_URL=http://dvwa:80
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    ports:
+      - "8000:8080"
     volumes:
+      # Mount host Docker socket so the backend can spin up sandbox containers
+      # on the host Docker daemon (which shares the kryptosproof_sandbox network)
+      - /var/run/docker.sock:/var/run/docker.sock
       - ./logs:/app/logs
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AI_MODEL=${AI_MODEL:-anthropic:claude-opus-4-6}
+      - TARGET_URL=http://dvwa:80
+      - SANDBOX_NETWORK=kryptosproof_sandbox
+      - LOGFIRE_TOKEN=${LOGFIRE_TOKEN:-}
+      - LOGFIRE_ENVIRONMENT=${LOGFIRE_ENVIRONMENT:-local}
+      # On Cloud Run: set DOCKER_HOST=tcp://<docker-vm-ip>:2375
+      # and SANDBOX_NETWORK to the network on that remote daemon.
+      - DOCKER_HOST=${DOCKER_HOST:-unix:///var/run/docker.sock}
+
+  # KryptosProof frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        # Points the Next.js proxy at the backend container
+        BACKEND_URL: http://kryptosproof:8080
+    depends_on:
+      - kryptosproof
+    networks:
+      - sandbox
+    ports:
+      - "3000:3000"
 
 networks:
   sandbox:

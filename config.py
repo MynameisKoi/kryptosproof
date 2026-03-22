@@ -74,6 +74,10 @@ class Settings(BaseSettings):
     zap_http_timeout: float = 45.0
     zap_spider_max_wait: int = 180
 
+    # Mock mode — bypasses all LLM calls and Docker sandbox for fast pipeline testing
+    # Enable via env var: MOCK_MODE=true  or  MOCK_MODE=1
+    mock_mode: bool = True
+
     # Logging
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 

@@ -1,8 +1,8 @@
-# KryptoSproof
+# KryptosProof
 
 > Automated web security audit platform — Hack Hayward 2026
 
-KryptoSproof is a multi-agent security framework built on [pydantic-ai](https://ai.pydantic.dev/) that orchestrates a full red team → blue team cycle against web applications. It automatically discovers vulnerabilities, generates exploit scripts, runs them in an isolated Docker sandbox, produces fix patches, verifies fix quality — all driven by an LLM orchestrator with no human intervention.
+KryptosProof is a multi-agent security framework built on [pydantic-ai](https://ai.pydantic.dev/) that orchestrates a full red team → blue team cycle against web applications. It automatically discovers vulnerabilities, generates exploit scripts, runs them in an isolated Docker sandbox, produces fix patches, verifies fix quality — all driven by an LLM orchestrator with no human intervention.
 
 ---
 
