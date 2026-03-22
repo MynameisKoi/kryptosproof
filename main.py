@@ -3,13 +3,19 @@ KryptoSproof — Automated Web Security Audit Platform
 Entry point: runs the full orchestrated red team → blue team cycle.
 """
 import asyncio
-import sys
 import json
+import logging
+import sys
 
 import logfire
 
 from config import settings
 from ai.agents.orchestrator import run_audit
+
+logging.basicConfig(
+    level=getattr(logging, settings.log_level, logging.INFO),
+    format="%(levelname)s %(name)s %(message)s",
+)
 
 if settings.logfire_token:
     logfire.configure(

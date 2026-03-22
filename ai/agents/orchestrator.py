@@ -8,6 +8,8 @@ import json
 
 from pydantic_ai import Agent, RunContext
 
+from config import settings
+from ai.tool_logging import tool_return_json
 from schemas import (
     AttackScriptResult,
     ExecutionResult,
@@ -20,7 +22,6 @@ from tools.attack_validation import AttackScriptValidationError, validate_attack
 from tools.execution_pipeline import run_attack_execution
 from ai.agents.blue_team.fix_script import fix_script_agent, FixScriptDeps
 from ai.agents.blue_team.testing import testing_agent, TestingDeps
-from config import settings
 
 _PROMPT = (Path(__file__).parent.parent / "prompt" / "orchestrator.md").read_text()
 
@@ -31,7 +32,7 @@ class OrchestratorDeps:
 
 
 orchestrator_agent = Agent(
-    model="anthropic:claude-opus-4-6",
+    model=settings.model,
     deps_type=OrchestratorDeps,
     output_type=SecurityAuditReport,
     system_prompt=_PROMPT,
@@ -65,7 +66,11 @@ async def run_red_team(ctx: RunContext[OrchestratorDeps], vulnerability_focus: s
     execution_dict = execution.model_dump()
     execution_dict["_attack_script"] = attack.model_dump()
 
-    return json.dumps(execution_dict)
+    return tool_return_json(
+        "run_red_team",
+        execution_dict,
+        detail=f"vulnerability_focus={vulnerability_focus}",
+    )
 
 
 @orchestrator_agent.tool
@@ -76,6 +81,7 @@ async def run_blue_team(ctx: RunContext[OrchestratorDeps], execution_result_json
     """
     target_url = ctx.deps.target_url
     data = json.loads(execution_result_json)
+    data.pop("tool_log", None)
 
     attack_data = data.pop("_attack_script", {})
     execution = ExecutionResult(**data)
@@ -118,7 +124,7 @@ async def run_blue_team(ctx: RunContext[OrchestratorDeps], execution_result_json
         "fix": fix.model_dump(),
         "test": test.model_dump(),
     }
-    return json.dumps(result)
+    return tool_return_json("run_blue_team", result, detail=f"target={target_url}")
 
 
 async def run_audit(target_url: str) -> SecurityAuditReport:

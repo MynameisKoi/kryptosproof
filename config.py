@@ -12,10 +12,10 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # LLM — MODEL / AI_MODEL set the pydantic-ai model id; Gemini auth from any of these env names
+    # LLM — pydantic-ai model id. Env keys (any one): MODEL, AI_MODEL, ai_model
     model: str = Field(
         default="anthropic:claude-opus-4-6",
-        validation_alias=AliasChoices("MODEL", "AI_MODEL"),
+        validation_alias=AliasChoices("MODEL", "AI_MODEL", "ai_model"),
     )
     gemini_api_key: str = Field(
         default="",
@@ -77,6 +77,11 @@ class Settings(BaseSettings):
     # Logfire (optional — empty disables token-based features in tests/CI)
     logfire_token: str = ""
     logfire_environment: str = ""
+
+    @property
+    def ai_model(self) -> str:
+        """Same as `model` — use either `settings.model` or `settings.ai_model` in code."""
+        return self.model
 
 
 settings = Settings()

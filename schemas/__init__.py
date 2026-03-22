@@ -23,6 +23,7 @@ _rt_exec = _load("red_team.py/execution.py")
 # Blue team schemas
 _bt_fix = _load("blue_team.py/fix_script.py")
 _bt_test = _load("blue_team.py/testing.py")
+_bt_handoff = _load("blue_team.py/handoff_report.py")
 
 # Orchestrator schemas (regular import path)
 from schemas.orchestrator import SecurityAuditReport, VulnerabilityReport  # noqa: E402
@@ -39,6 +40,8 @@ FixScriptResult = _bt_fix.FixScriptResult
 VulnerabilityCheckResult = _bt_test.VulnerabilityCheckResult
 TestResult = _bt_test.TestResult
 
+BlueTeamHandoffReport = _bt_handoff.BlueTeamHandoffReport
+
 __all__ = [
     "AttackPayload",
     "AttackScriptResult",
@@ -48,6 +51,7 @@ __all__ = [
     "FixScriptResult",
     "VulnerabilityCheckResult",
     "TestResult",
+    "BlueTeamHandoffReport",
     "VulnerabilityReport",
     "SecurityAuditReport",
 ]
