@@ -8,6 +8,7 @@ from pathlib import Path
 from pydantic_ai import Agent, RunContext
 
 from schemas import ExecutionResult, FixScriptResult
+from tools.gitleaks import run_gitleaks
 
 _PROMPT = (Path(__file__).parent.parent.parent / "prompt" / "blue_team" / "fix_script.md").read_text()
 
@@ -15,12 +16,13 @@ _PROMPT = (Path(__file__).parent.parent.parent / "prompt" / "blue_team" / "fix_s
 @dataclass
 class FixScriptDeps:
     execution_result: ExecutionResult
+    source_repo_path: str | None = None
 
 
 fix_script_agent = Agent(
     model="anthropic:claude-opus-4-6",
     deps_type=FixScriptDeps,
-    result_type=FixScriptResult,
+    output_type=FixScriptResult,
     system_prompt=_PROMPT,
 )
 
@@ -40,3 +42,18 @@ async def get_execution_details(ctx: RunContext[FixScriptDeps]) -> dict:
         "crash_detected": er.crash_detected,
         "raw_responses": er.raw_responses,
     }
+
+
+@fix_script_agent.tool
+async def scan_secrets_with_gitleaks(ctx: RunContext[FixScriptDeps]) -> dict:
+    """
+    Run Gitleaks on SOURCE_REPO_PATH (configured via environment / orchestrator deps).
+    Use to find hardcoded keys before recommending credential rotation.
+    """
+    path = ctx.deps.source_repo_path
+    if not path:
+        return {
+            "available": False,
+            "error": "No source_repo_path — set SOURCE_REPO_PATH to a local clone of the app under review.",
+        }
+    return await run_gitleaks(path)

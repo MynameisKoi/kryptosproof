@@ -24,7 +24,7 @@ class TestingDeps:
 testing_agent = Agent(
     model="anthropic:claude-opus-4-6",
     deps_type=TestingDeps,
-    result_type=TestResult,
+    output_type=TestResult,
     system_prompt=_PROMPT,
 )
 
