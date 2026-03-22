@@ -14,8 +14,8 @@ class Settings(BaseSettings):
 
     # LLM — MODEL / AI_MODEL set the pydantic-ai model id; Gemini auth from any of these env names
     model: str = Field(
-        default="anthropic:claude-opus-4-6",
-        validation_alias=AliasChoices("MODEL", "AI_MODEL"),
+        default=os.getenv("AI_MODEL"),
+        
     )
     gemini_api_key: str = Field(
         default="",
@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     # Blue team — Gitleaks (optional local repo)
     source_repo_path: str | None = None
     gitleaks_timeout: int = 120
+
+    # Blue team — patch workspace mirror source (optional host path to copy into workspace)
+    blue_team_mirror_source: str | None = None
 
     # OWASP ZAP JSON API (ZAP daemon must be running)
     zap_proxy_url: str = "http://127.0.0.1:8080"

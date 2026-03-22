@@ -8,7 +8,7 @@ from pathlib import Path
 from pydantic_ai import Agent
 
 from schemas import BlueTeamHandoffReport
-
+from config import settings
 _PROMPT = (Path(__file__).parent.parent.parent / "prompt" / "blue_team" / "handoff_report.md").read_text()
 
 
@@ -20,8 +20,8 @@ class HandoffReportDeps:
 
 
 handoff_report_agent = Agent(
-    model="anthropic:claude-opus-4-6",
+    model=settings.model,
     deps_type=HandoffReportDeps,
-    result_type=BlueTeamHandoffReport,
+    output_type=BlueTeamHandoffReport,
     system_prompt=_PROMPT,
 )

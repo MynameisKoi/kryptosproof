@@ -9,6 +9,12 @@ from pydantic_ai import Agent, RunContext
 
 from schemas import ExecutionResult, FixScriptResult
 from tools.gitleaks import run_gitleaks
+from tools.patch_workspace import (
+    create_patch_workspace,
+    destroy_patch_workspace,
+    apply_fix_script_in_workspace,
+)
+from config import settings
 
 _PROMPT = (Path(__file__).parent.parent.parent / "prompt" / "blue_team" / "fix_script.md").read_text()
 
@@ -20,7 +26,7 @@ class FixScriptDeps:
 
 
 fix_script_agent = Agent(
-    model="anthropic:claude-opus-4-6",
+    model=settings.model,
     deps_type=FixScriptDeps,
     output_type=FixScriptResult,
     system_prompt=_PROMPT,
@@ -42,6 +48,23 @@ async def get_execution_details(ctx: RunContext[FixScriptDeps]) -> dict:
         "crash_detected": er.crash_detected,
         "raw_responses": er.raw_responses,
     }
+
+
+@fix_script_agent.tool
+async def run_fix_in_workspace(ctx: RunContext[FixScriptDeps], fix_script: str) -> dict:
+    """
+    Execute the generated fix_script inside an ephemeral Docker workspace to verify it runs
+    without errors. The workspace is isolated — the host and DVWA are never modified.
+    Returns exit_code, stdout, stderr so you can confirm the fix applied cleanly.
+    """
+    target_url = ctx.deps.execution_result.target_url
+    cid = await create_patch_workspace()
+    try:
+        result = await apply_fix_script_in_workspace(cid, fix_script, target_url)
+    finally:
+        await destroy_patch_workspace(cid)
+    result["success"] = result.get("exit_code", 1) == 0
+    return result
 
 
 @fix_script_agent.tool

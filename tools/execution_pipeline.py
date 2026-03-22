@@ -27,7 +27,8 @@ def _parse_vuln_markers(stdout: str) -> list[str]:
         if "[VULN]" not in line.upper():
             continue
         m = re.search(r"\[VULN\]\s*:?\s*(.*)", line, flags=re.IGNORECASE)
-        desc = (m.group(1).strip() if m else "") or line.strip()
+        raw = m.group(1).strip() if m else ""
+        desc = raw if raw and raw.upper() != "[VULN]" else line.strip()
         if desc and desc not in seen:
             seen.add(desc)
             out.append(desc[:500])
