@@ -1,0 +1,17 @@
+.git
+.env
+.env.example
+.venv
+.logfire
+.pytest_cache
+__pycache__
+*.pyc
+logs/
+tests/
+docs/
+src/
+frontend/node_modules
+frontend/.next
+.python-version
+uv.lock
+README.md

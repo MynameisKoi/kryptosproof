@@ -12,20 +12,23 @@ services:
       - RECAPTCHA_PRIV_KEY=
       - RECAPTCHA_PUB_KEY=
 
-  # Main kryptosproof platform
+  # Main kryptosproof platform (frontend + backend in one image)
   kryptosproof:
     build:
       context: .
       dockerfile: Dockerfile
-    # Image default CMD is the HTTP server for Cloud Run; locally we run the batch audit.
-    command: ["python", "main.py"]
+    ports:
+      - "3000:3000"
     depends_on:
       - dvwa
     networks:
       - sandbox
     environment:
+      - PORT=3000
       - TARGET_URL=http://dvwa:80
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - AI_MODEL=${AI_MODEL}
     volumes:
       - ./logs:/app/logs
 

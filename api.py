@@ -32,10 +32,15 @@ app = FastAPI(title="KryptoSproof API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "kryptosproof-api"}
 
 # In-memory audit store
 _audits: dict[str, dict[str, Any]] = {}
