@@ -53,3 +53,14 @@ def validate_attack_script_result(attack: AttackScriptResult, expected_target_ur
 
     if not attack.target_endpoints:
         raise AttackScriptValidationError("target_endpoints must list at least one path or URL fragment.")
+
+    if not re.search(r'print\s*\(.*\[VULN\]', script, re.IGNORECASE):
+        raise AttackScriptValidationError(
+            "script must contain at least one print('[VULN] ...') call so confirmed vulnerabilities can be detected. "
+            "Add a line like: print('[VULN] <description of what was found>') when a vulnerability is confirmed."
+        )
+
+    if not attack.expected_indicators:
+        raise AttackScriptValidationError(
+            "expected_indicators must contain at least one string that appears in stdout when the vulnerability is confirmed."
+        )

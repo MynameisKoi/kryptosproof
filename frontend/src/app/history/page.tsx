@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Globe,
@@ -12,14 +15,26 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { AuditStatusBadge, OverallStatusBadge } from "@/components/ui/Badge";
-import { mockAudits } from "@/lib/mock-data";
+import { listAudits } from "@/lib/api";
 import { formatDate, patchRate } from "@/lib/utils";
-
-const sorted = [...mockAudits].sort(
-  (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-);
+import type { Audit } from "@/lib/types";
 
 export default function HistoryPage() {
+  const [sorted, setSorted] = useState<Audit[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const data = await listAudits();
+        if (!cancelled) setSorted(data);
+      } catch { /* backend not running */ }
+    };
+    load();
+    const id = setInterval(load, 5000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
   return (
     <div className="min-h-full">
       <PageHeader

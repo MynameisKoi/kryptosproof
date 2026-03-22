@@ -13,7 +13,7 @@ from schemas import AttackScriptResult
 from tools.attack_validation import AttackScriptValidationError, validate_attack_script_result
 from tools.payloads_pat import read_payload_lines, search_payload_files
 from tools.red_team import run_ffuf_directory_fuzz, run_nuclei_scan, run_sqlmap_probe
-from tools.web_recon import probe_endpoints, get_security_headers, detect_technologies, get_forms
+from tools.web_recon import probe_endpoints, get_security_headers, detect_technologies, get_forms, authenticate_to_target
 from tools.zap_api import zap_active_scan, zap_ping, zap_spider_and_alerts
 
 _PROMPT = (Path(__file__).parent.parent.parent / "prompt" / "red_team" / "attack_script.md").read_text()
@@ -29,6 +29,7 @@ attack_script_agent = Agent(
     deps_type=AttackScriptDeps,
     output_type=AttackScriptResult,
     system_prompt=_PROMPT,
+    retries=3,
 )
 
 
@@ -39,6 +40,17 @@ def validate_attack_output(ctx: RunContext[AttackScriptDeps], data: AttackScript
     except AttackScriptValidationError as e:
         raise ModelRetry(str(e)) from e
     return data
+
+
+@attack_script_agent.tool
+async def authenticate(ctx: RunContext[AttackScriptDeps]) -> dict:
+    """
+    Detect whether the target requires authentication and attempt login with common credentials.
+    Call this FIRST before generating the attack script.
+    Returns login URL, form fields, session cookies, and a note explaining that the attack
+    script must reproduce the login sequence itself (the sandbox does not share this session).
+    """
+    return await authenticate_to_target(ctx.deps.target_url)
 
 
 @attack_script_agent.tool

@@ -87,14 +87,18 @@ async def run_script_string(container_id: str, script: str, timeout: int = 30) -
         client = _client()
         container = client.containers.get(container_id)
 
-        container.exec_run(["pip", "install", "httpx", "--quiet"], demux=False)
+        pip_result = container.exec_run(["pip", "install", "httpx", "--quiet"], demux=False)
+        if pip_result.exit_code != 0:
+            raise RuntimeError(
+                f"httpx installation failed (exit={pip_result.exit_code}): "
+                + (pip_result.output or b"").decode("utf-8", errors="replace")[:500]
+            )
 
         _put_script_archive(container_id, script)
 
         result = container.exec_run(
-            ["python", "/tmp/script.py"],
+            ["timeout", str(timeout), "python", "/tmp/script.py"],
             demux=True,
-            timeout=timeout,
         )
 
         exit_code = result.exit_code if result.exit_code is not None else -1

@@ -20,31 +20,40 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { AuditStatusBadge, SeverityBadge } from "@/components/ui/Badge";
-import { mockAudits } from "@/lib/mock-data";
+import { listAudits } from "@/lib/api";
 import { formatDate, formatDuration, cn } from "@/lib/utils";
-import type { AuditPhase, VulnerabilityFinding } from "@/lib/types";
-
-// The currently running audit (if any)
-const liveAudit = mockAudits.find((a) => a.status === "running") ?? null;
-
-// Unique targets from past audits for quick re-audit
-const recentTargets = [...new Set(
-  mockAudits
-    .filter((a) => a.status !== "running")
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .map((a) => a.targetUrl)
-)].slice(0, 4);
+import type { Audit, AuditPhase, VulnerabilityFinding } from "@/lib/types";
 
 export default function DashboardPage() {
-  if (liveAudit) {
-    return <LiveAuditView />;
-  }
-  return <NoAuditView />;
+  const [audits, setAudits] = useState<Audit[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const data = await listAudits();
+        if (!cancelled) setAudits(data);
+      } catch { /* backend not running yet */ }
+    };
+    load();
+    const id = setInterval(load, 3000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
+  const liveAudit = audits.find((a) => a.status === "running") ?? null;
+  const recentTargets = [...new Set(
+    audits
+      .filter((a) => a.status !== "running")
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .map((a) => a.targetUrl)
+  )].slice(0, 4);
+
+  if (liveAudit) return <LiveAuditView audit={liveAudit} />;
+  return <NoAuditView recentTargets={recentTargets} audits={audits} />;
 }
 
 /* ─── Live audit view ─────────────────────────────────────── */
-function LiveAuditView() {
-  const audit = liveAudit!;
+function LiveAuditView({ audit }: { audit: Audit }) {
   const runningPhase = audit.phases.find((p) => p.status === "running");
   const [elapsed, setElapsed] = useState(0);
 
@@ -54,7 +63,7 @@ function LiveAuditView() {
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [audit.createdAt]);
 
   return (
     <div className="min-h-full">
@@ -143,7 +152,7 @@ function LiveAuditView() {
 }
 
 /* ─── No audit running view ───────────────────────────────── */
-function NoAuditView() {
+function NoAuditView({ recentTargets, audits }: { recentTargets: string[]; audits: Audit[] }) {
   return (
     <div className="min-h-full flex flex-col">
       <PageHeader
@@ -186,7 +195,7 @@ function NoAuditView() {
             </p>
             <div className="space-y-2">
               {recentTargets.map((url) => {
-                const lastAudit = mockAudits
+                const lastAudit = audits
                   .filter((a) => a.targetUrl === url)
                   .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
                 return (

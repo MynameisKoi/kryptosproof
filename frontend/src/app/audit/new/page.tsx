@@ -21,6 +21,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+import { startAudit } from "@/lib/api";
 import type { VulnType, Severity } from "@/lib/types";
 
 const VULN_TYPES: { type: VulnType; icon: React.ElementType; description: string; color: string }[] = [
@@ -65,9 +66,16 @@ export default function NewAuditPage() {
   const handleLaunch = async () => {
     if (!validate()) return;
     setLaunching(true);
-    // TODO: POST /api/audits to start real audit
-    await new Promise((r) => setTimeout(r, 1200));
-    router.push("/audit/audit-001");
+    try {
+      const audit = await startAudit({
+        targetUrl,
+        vulnerabilityTypes: selectedTypes,
+        severityThreshold: severity,
+      });
+      router.push(`/audit/${audit.id}`);
+    } catch {
+      setLaunching(false);
+    }
   };
 
   return (
