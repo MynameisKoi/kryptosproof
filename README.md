@@ -33,16 +33,16 @@ Target URL
 
 ## Vulnerability Coverage
 
-| Type | Severity |
-|---|---|
-| SQL Injection | Critical / High |
-| Cross-Site Scripting (XSS) | High |
-| Command Injection | Critical |
-| Path Traversal | High |
-| Broken Authentication | Critical |
-| CSRF | Medium |
-| SSRF | High |
-| Security Misconfiguration | Low / Medium |
+| Type |
+|---|
+| SQL Injection |
+| Cross-Site Scripting (XSS) |
+| Command Injection |
+| Path Traversal |
+| Broken Authentication |
+| CSRF |
+| SSRF |
+| Security Misconfiguration |
 
 ---
 
