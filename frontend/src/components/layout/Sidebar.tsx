@@ -35,7 +35,7 @@ export function Sidebar() {
         </div>
         <div>
           <div className="text-sm font-bold tracking-wide text-fg-base leading-none">
-            Krypto<span className="text-blue-400">Sproof</span>
+            Kryptos<span className="text-blue-400">Proof</span>
           </div>
           <div className="text-[9px] text-fg-subtle tracking-widest uppercase">
             Security Audit

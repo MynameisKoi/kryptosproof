@@ -143,7 +143,7 @@ function LiveAuditView({ audit }: { audit: Audit }) {
 
         {runningPhase && (
           <p className="text-[10px] text-fg-faint text-center">
-            KryptoSproof · Claude Opus 4.6 · {runningPhase.name}
+            KryptosProof · Claude Opus 4.6 · {runningPhase.name}
           </p>
         )}
       </div>

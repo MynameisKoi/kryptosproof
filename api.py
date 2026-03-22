@@ -1,5 +1,5 @@
 """
-KryptoSproof FastAPI server
+KryptosProof FastAPI server
 Exposes the red-team / blue-team audit pipeline as a REST API.
 """
 # Load .env before any agent/model imports so API keys are available
@@ -25,7 +25,7 @@ if settings.logfire_token:
     )
     logfire.instrument_pydantic_ai()
 
-app = FastAPI(title="KryptoSproof API")
+app = FastAPI(title="KryptosProof API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -114,6 +114,7 @@ def _map_report_to_audit(audit: dict, report: Any) -> None:
 async def _run_audit_task(audit_id: str) -> None:
     from ai.agents.orchestrator import OrchestratorDeps, orchestrator_agent
     from schemas import SecurityAuditReport
+    from tools.mock_pipeline import run_mock_audit
 
     audit = _audits[audit_id]
     audit["status"] = "running"
@@ -240,19 +241,28 @@ async def _run_audit_task(audit_id: str) -> None:
         })
 
     try:
-        result = await orchestrator_agent.run(
-            f"Run a complete security audit against: {target_url}. "
-            "Test for SQL Injection, XSS, Command Injection, Path Traversal, and CSRF. "
-            "After red team, apply blue team fixes and verify each vulnerability is patched.",
-            deps=OrchestratorDeps(
+        if settings.mock_mode:
+            report: SecurityAuditReport = await run_mock_audit(
                 target_url=target_url,
                 on_red_team_start=on_red_team_start,
                 on_red_team_end=on_red_team_end,
                 on_blue_team_start=on_blue_team_start,
                 on_blue_team_end=on_blue_team_end,
-            ),
-        )
-        report: SecurityAuditReport = result.output
+            )
+        else:
+            result = await orchestrator_agent.run(
+                f"Run a complete security audit against: {target_url}. "
+                "Test for SQL Injection, XSS, Command Injection, Path Traversal, and CSRF. "
+                "After red team, apply blue team fixes and verify each vulnerability is patched.",
+                deps=OrchestratorDeps(
+                    target_url=target_url,
+                    on_red_team_start=on_red_team_start,
+                    on_red_team_end=on_red_team_end,
+                    on_blue_team_start=on_blue_team_start,
+                    on_blue_team_end=on_blue_team_end,
+                ),
+            )
+            report: SecurityAuditReport = result.output
 
         # Populate summary fields from the final report (vulnerabilities stay frozen)
         _map_report_to_audit(audit, report)

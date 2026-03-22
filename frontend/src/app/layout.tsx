@@ -4,7 +4,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { ThemeProvider } from "@/lib/theme";
 
 export const metadata: Metadata = {
-  title: "KryptoSproof — Automated Security Audit",
+  title: "KryptosProof — Automated Security Audit",
   description: "AI-powered red team / blue team security audit platform",
 };
 

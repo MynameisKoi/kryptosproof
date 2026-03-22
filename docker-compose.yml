@@ -4,33 +4,38 @@ services:
   # Deliberately vulnerable web app — red team target
   dvwa:
     image: vulnerables/web-dvwa
-    ports:
-      - "8080:80"
     networks:
       - sandbox
     environment:
       - RECAPTCHA_PRIV_KEY=
       - RECAPTCHA_PUB_KEY=
 
-  # Main kryptosproof platform (frontend + backend in one image)
+  # KryptosProof — backend API + frontend bundled in one image
   kryptosproof:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
     depends_on:
       - dvwa
     networks:
       - sandbox
-    environment:
-      - PORT=3000
-      - TARGET_URL=http://dvwa:80
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - AI_MODEL=${AI_MODEL}
+    ports:
+      - "8080:8080"   # FastAPI backend
+      - "3000:3000"   # Next.js frontend
     volumes:
+      # Mount host Docker socket for sandbox container creation
+      - /var/run/docker.sock:/var/run/docker.sock
       - ./logs:/app/logs
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AI_MODEL=${AI_MODEL:-anthropic:claude-opus-4-6}
+      - TARGET_URL=http://dvwa:80
+      - SANDBOX_NETWORK=kryptosproof_sandbox
+      - MOCK_MODE=${MOCK_MODE:-false}
+      - LOGFIRE_TOKEN=${LOGFIRE_TOKEN:-}
+      - LOGFIRE_ENVIRONMENT=${LOGFIRE_ENVIRONMENT:-local}
+      # On Cloud Run: set DOCKER_HOST=tcp://<docker-vm-ip>:2375
+      - DOCKER_HOST=${DOCKER_HOST:-unix:///var/run/docker.sock}
 
 networks:
   sandbox:
