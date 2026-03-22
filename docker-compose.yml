@@ -10,7 +10,7 @@ services:
       - RECAPTCHA_PRIV_KEY=
       - RECAPTCHA_PUB_KEY=
 
-  # KryptosProof backend API
+  # KryptosProof — backend API + frontend bundled in one image
   kryptosproof:
     build:
       context: .
@@ -20,10 +20,10 @@ services:
     networks:
       - sandbox
     ports:
-      - "8000:8080"
+      - "8080:8080"   # FastAPI backend
+      - "3000:3000"   # Next.js frontend
     volumes:
-      # Mount host Docker socket so the backend can spin up sandbox containers
-      # on the host Docker daemon (which shares the kryptosproof_sandbox network)
+      # Mount host Docker socket for sandbox container creation
       - /var/run/docker.sock:/var/run/docker.sock
       - ./logs:/app/logs
     environment:
@@ -31,26 +31,11 @@ services:
       - AI_MODEL=${AI_MODEL:-anthropic:claude-opus-4-6}
       - TARGET_URL=http://dvwa:80
       - SANDBOX_NETWORK=kryptosproof_sandbox
+      - MOCK_MODE=${MOCK_MODE:-false}
       - LOGFIRE_TOKEN=${LOGFIRE_TOKEN:-}
       - LOGFIRE_ENVIRONMENT=${LOGFIRE_ENVIRONMENT:-local}
       # On Cloud Run: set DOCKER_HOST=tcp://<docker-vm-ip>:2375
-      # and SANDBOX_NETWORK to the network on that remote daemon.
       - DOCKER_HOST=${DOCKER_HOST:-unix:///var/run/docker.sock}
-
-  # KryptosProof frontend
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-      args:
-        # Points the Next.js proxy at the backend container
-        BACKEND_URL: http://kryptosproof:8080
-    depends_on:
-      - kryptosproof
-    networks:
-      - sandbox
-    ports:
-      - "3000:3000"
 
 networks:
   sandbox:

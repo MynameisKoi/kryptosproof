@@ -1,14 +1,40 @@
 """
 Docker sandbox manager — isolated containers for attack script execution.
-Scripts are copied with tar (put_archive) to avoid shell escaping limits.
+Falls back to direct subprocess execution when Docker is unavailable (e.g. Cloud Run).
 """
 import asyncio
 import io
+import os
+import subprocess
 import tarfile
+import tempfile
 from dataclasses import dataclass
 
-import docker
-from docker.errors import DockerException
+try:
+    import docker
+    from docker.errors import DockerException
+
+    def _docker_available() -> bool:
+        try:
+            docker.from_env().ping()
+            return True
+        except Exception:
+            return False
+except ImportError:
+    _docker_available = lambda: False  # noqa: E731
+
+    class DockerException(Exception):  # type: ignore[no-redef]
+        pass
+
+_DOCKER_OK: bool | None = None
+
+def _use_docker() -> bool:
+    global _DOCKER_OK
+    if _DOCKER_OK is None:
+        _DOCKER_OK = _docker_available()
+        if not _DOCKER_OK:
+            print("[sandbox] Docker unavailable — using direct subprocess execution")
+    return _DOCKER_OK
 
 
 @dataclass
@@ -31,7 +57,7 @@ _CRASH_SUBSTRINGS = (
 )
 
 
-def _client() -> docker.DockerClient:
+def _client() -> "docker.DockerClient":
     return docker.from_env()
 
 
@@ -43,7 +69,7 @@ def _crash_from_streams(exit_code: int, stderr: str) -> bool:
 
 
 def _put_script_archive(container_id: str, script: str) -> None:
-    """Write /tmp/script.py inside the container via docker put_archive (no shell quoting)."""
+    """Write /tmp/script.py inside the container via docker put_archive."""
     client = _client()
     container = client.containers.get(container_id)
     data = script.encode("utf-8")
@@ -59,8 +85,53 @@ def _put_script_archive(container_id: str, script: str) -> None:
         raise RuntimeError("put_archive failed to write /tmp/script.py")
 
 
+# ── Subprocess fallback (no Docker) ──────────────────────────────────────
+
+_FALLBACK_ID = "subprocess-fallback"
+
+
+async def _subprocess_run_script(script: str, timeout: int = 30) -> SandboxResult:
+    """Run a script directly via subprocess (used when Docker is unavailable)."""
+    loop = asyncio.get_running_loop()
+
+    def _run():
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write(script)
+            script_path = f.name
+        try:
+            result = subprocess.run(
+                ["python", script_path],
+                capture_output=True,
+                timeout=timeout,
+                text=True,
+            )
+            return SandboxResult(
+                container_id=_FALLBACK_ID,
+                exit_code=result.returncode,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                crash_detected=_crash_from_streams(result.returncode, result.stderr),
+            )
+        except subprocess.TimeoutExpired:
+            return SandboxResult(
+                container_id=_FALLBACK_ID,
+                exit_code=124,
+                stdout="",
+                stderr=f"Script timed out after {timeout}s",
+                crash_detected=True,
+            )
+        finally:
+            os.unlink(script_path)
+
+    return await loop.run_in_executor(None, _run)
+
+
+# ── Public API ────────────────────────────────────────────────────────────
+
 async def create_sandbox(image: str = "python:3.11-slim", network: str = "kryptosproof_sandbox") -> str:
-    """Create and start a sandbox container, return container ID."""
+    if not _use_docker():
+        return _FALLBACK_ID
+
     loop = asyncio.get_running_loop()
 
     def _create():
@@ -80,7 +151,9 @@ async def create_sandbox(image: str = "python:3.11-slim", network: str = "krypto
 
 
 async def run_script_string(container_id: str, script: str, timeout: int = 30) -> SandboxResult:
-    """Install httpx, write script to /tmp/script.py via tar, run python /tmp/script.py."""
+    if container_id == _FALLBACK_ID:
+        return await _subprocess_run_script(script, timeout)
+
     loop = asyncio.get_running_loop()
 
     def _run():
@@ -105,21 +178,21 @@ async def run_script_string(container_id: str, script: str, timeout: int = 30) -
         stdout = (result.output[0] or b"").decode("utf-8", errors="replace")
         stderr = (result.output[1] or b"").decode("utf-8", errors="replace")
 
-        crash_detected = _crash_from_streams(exit_code, stderr)
-
         return SandboxResult(
             container_id=container_id,
             exit_code=exit_code,
             stdout=stdout,
             stderr=stderr,
-            crash_detected=crash_detected,
+            crash_detected=_crash_from_streams(exit_code, stderr),
         )
 
     return await loop.run_in_executor(None, _run)
 
 
 async def destroy_sandbox(container_id: str) -> None:
-    """Stop and remove the sandbox container."""
+    if container_id == _FALLBACK_ID:
+        return
+
     loop = asyncio.get_running_loop()
 
     def _destroy():

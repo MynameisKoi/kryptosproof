@@ -1,6 +1,27 @@
+# ─── Stage 1: Build the Next.js frontend ────────────────────────────────────
+FROM node:20-slim AS frontend
+
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm ci
+
+COPY frontend/ .
+ENV NEXT_TELEMETRY_DISABLED=1
+# API runs on localhost:8000 inside the container (see start.sh)
+ARG BACKEND_URL=http://localhost:8000
+ENV BACKEND_URL=${BACKEND_URL}
+RUN npm run build
+
+# ─── Stage 2: Python backend + security tools + frontend runtime ─────────────
 FROM python:3.12-slim
 
 WORKDIR /app
+
+# Node.js runtime (to serve the Next.js standalone server)
+COPY --from=node:20-slim /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:20-slim /usr/local/include/node /usr/local/include/node
+COPY --from=node:20-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl unzip git \
@@ -38,7 +59,7 @@ RUN curl -fsSL -o /tmp/gitleaks.tgz \
 # Nuclei templates
 RUN nuclei -update-templates -silent || true
 
-# Install Python dependencies as a separate layer (cache-friendly)
+# Python dependencies
 COPY pyproject.toml .
 RUN pip install --no-cache-dir \
     "pydantic-ai>=0.0.14" \
@@ -52,14 +73,26 @@ RUN pip install --no-cache-dir \
     "fastapi>=0.115.0" \
     "uvicorn[standard]>=0.30.0"
 
-# Copy application source
-COPY . .
+# Copy Python source (explicit — avoids node_modules, .next, .venv, etc.)
+COPY *.py ./
+COPY ai/ ai/
+COPY schemas/ schemas/
+COPY tools/ tools/
+COPY third_party/ third_party/
+COPY wordlists/ wordlists/
 
-# Cloud Run injects PORT at runtime; default to 8080
-ENV PORT=8080
+# Copy Next.js standalone build + static assets (must match start.sh: cd /app/frontend)
+COPY --from=frontend /app/frontend/.next/standalone ./frontend/
+COPY --from=frontend /app/frontend/.next/static      ./frontend/.next/static
+COPY --from=frontend /app/frontend/public            ./frontend/public
+
+# Startup script (waits for API health before starting Next.js)
+COPY start.sh .
+RUN chmod +x start.sh
+
+# Cloud Run injects PORT; start.sh uses it for Next.js
 EXPOSE 8080
 
-# NOTE: The Docker sandbox requires a Docker daemon reachable at DOCKER_HOST.
-# On Cloud Run, set DOCKER_HOST=tcp://<your-docker-vm-ip>:2375 and
-# SANDBOX_NETWORK to the network name on that remote daemon.
-CMD ["sh", "-c", "uvicorn api:app --host 0.0.0.0 --port ${PORT} --workers 1"]
+# NOTE: Docker sandbox requires a daemon reachable at DOCKER_HOST.
+# On Cloud Run, set DOCKER_HOST=tcp://<docker-vm-ip>:2375
+CMD ["./start.sh"]

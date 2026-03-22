@@ -14,8 +14,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -212,5 +212,5 @@ third_party/PayloadsAllTheThings/
 # Next.js
 frontend/.next/
 frontend/node_modules/
-frontend/package-lock.json
+# frontend/package-lock.json  — tracked; needed for reproducible Docker builds
 frontend/next-env.d.ts

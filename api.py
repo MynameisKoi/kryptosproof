@@ -25,18 +25,19 @@ if settings.logfire_token:
     )
     logfire.instrument_pydantic_ai()
 
-from ai.agents.orchestrator import OrchestratorDeps, orchestrator_agent  # noqa: E402
-from schemas import SecurityAuditReport  # noqa: E402
-from tools.mock_pipeline import run_mock_audit  # noqa: E402
-
 app = FastAPI(title="KryptosProof API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "kryptosproof-api"}
 
 # In-memory audit store
 _audits: dict[str, dict[str, Any]] = {}
@@ -101,7 +102,7 @@ def _append_phase_output(audit: dict, phase_id: str, text: str) -> None:
             break
 
 
-def _map_report_to_audit(audit: dict, report: SecurityAuditReport) -> None:
+def _map_report_to_audit(audit: dict, report: Any) -> None:
     """Populate audit summary fields from the final SecurityAuditReport.
     Vulnerabilities are frozen after phase 2 — we never overwrite them here."""
     audit["totalVulnerabilities"] = report.total_vulnerabilities
@@ -111,6 +112,10 @@ def _map_report_to_audit(audit: dict, report: SecurityAuditReport) -> None:
 
 
 async def _run_audit_task(audit_id: str) -> None:
+    from ai.agents.orchestrator import OrchestratorDeps, orchestrator_agent
+    from schemas import SecurityAuditReport
+    from tools.mock_pipeline import run_mock_audit
+
     audit = _audits[audit_id]
     audit["status"] = "running"
     target_url = audit["targetUrl"]
