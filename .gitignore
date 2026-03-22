@@ -208,3 +208,6 @@ __marimo__/
 
 # Large optional clone (PayloadsAllTheThings)
 third_party/PayloadsAllTheThings/
+
+# Next.js
+frontend/.next/
