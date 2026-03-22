@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  # Deliberately vulnerable web app — red team target
+  dvwa:
+    image: vulnerables/web-dvwa
+    ports:
+      - "8080:80"
+    networks:
+      - sandbox
+    environment:
+      - RECAPTCHA_PRIV_KEY=
+      - RECAPTCHA_PUB_KEY=
+
+  # Main kryptosproof platform
+  kryptosproof:
+    build: .
+    depends_on:
+      - dvwa
+    networks:
+      - sandbox
+    environment:
+      - TARGET_URL=http://dvwa:80
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - ./logs:/app/logs
+
+networks:
+  sandbox:
+    driver: bridge
+    name: kryptosproof_sandbox

@@ -1,0 +1,14 @@
+[project]
+name = "kryptosproof"
+version = "0.1.0"
+description = "Automated web security audit platform — multi-agent red/blue team"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic-ai>=0.0.14",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "anthropic>=0.40.0",
+    "httpx>=0.27.0",
+    "docker>=7.0.0",
+    "python-dotenv>=1.0.0",
+]
