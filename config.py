@@ -14,8 +14,7 @@ class Settings(BaseSettings):
 
     # LLM — MODEL / AI_MODEL set the pydantic-ai model id; Gemini auth from any of these env names
     model: str = Field(
-        default=os.getenv("AI_MODEL"),
-        
+        default=os.getenv("AI_MODEL", ""),
     )
     gemini_api_key: str = Field(
         default="",
