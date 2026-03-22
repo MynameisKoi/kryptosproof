@@ -1,0 +1,12 @@
+admin
+api
+vulnerabilities
+login
+upload
+config
+.env
+backup
+phpinfo.php
+robots.txt
+.svn
+.git

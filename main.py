@@ -11,12 +11,13 @@ import logfire
 from config import settings
 from ai.agents.orchestrator import run_audit
 
-logfire.configure(
-    token=settings.logfire_token,
-    environment=settings.logfire_environment,
-    service_name="kryptosproof",
-)
-logfire.instrument_pydantic_ai()
+if settings.logfire_token:
+    logfire.configure(
+        token=settings.logfire_token,
+        environment=settings.logfire_environment or "local",
+        service_name="kryptosproof",
+    )
+    logfire.instrument_pydantic_ai()
 
 
 async def main():

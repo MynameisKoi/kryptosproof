@@ -14,7 +14,9 @@ services:
 
   # Main kryptosproof platform
   kryptosproof:
-    build: .
+    build:
+      context: .
+      dockerfile: dockerfile
     depends_on:
       - dvwa
     networks:

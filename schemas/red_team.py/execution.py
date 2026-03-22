@@ -22,6 +22,10 @@ class ExecutionResult(BaseModel):
     error_logs: str = Field(
         description="Parsed error logs relevant to blue team patching"
     )
+    logs: str = Field(
+        default="",
+        description="Combined human-readable run log (status, stdout/stderr excerpts) for agents and tracing",
+    )
     status: Literal["exploited", "failed", "partial", "error"]
     raw_responses: list[dict] = Field(
         default_factory=list,
