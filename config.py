@@ -24,12 +24,16 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def normalize_model_and_sync_gemini_env(self) -> Self:
-        """Bare gemini-* ids become google-gla:…; mirror GOOGLE_AI_API / gemini key into GEMINI_API_KEY for the SDK."""
+        """Add provider prefix when a bare model name is given (gpt-* → openai:, gemini-* → google-gla:)."""
         m = self.model.strip()
         if not m:
             self.model = "anthropic:claude-opus-4-6"
-        elif ":" not in m and m.lower().startswith("gemini"):
-            self.model = f"google-gla:{m}"
+        elif ":" not in m:
+            low = m.lower()
+            if low.startswith("gemini"):
+                self.model = f"google-gla:{m}"
+            elif low.startswith(("gpt-", "o1-", "o3-", "o4-")):
+                self.model = f"openai:{m}"
 
         key = self.gemini_api_key.strip()
         if key:
