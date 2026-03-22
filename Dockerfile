@@ -84,7 +84,6 @@ COPY wordlists/ wordlists/
 # Copy Next.js standalone build + static assets (must match start.sh: cd /app/frontend)
 COPY --from=frontend /app/frontend/.next/standalone ./frontend/
 COPY --from=frontend /app/frontend/.next/static      ./frontend/.next/static
-COPY --from=frontend /app/frontend/public            ./frontend/public
 
 # Startup script (waits for API health before starting Next.js)
 COPY start.sh .
