@@ -46,8 +46,12 @@ RUN pip install --no-cache-dir \
     "anthropic>=0.40.0" \
     "httpx>=0.27.0" \
     "docker>=7.0.0" \
-    "python-dotenv>=1.0.0"
+    "python-dotenv>=1.0.0" \
+    "logfire>=4.29.0" \
+    "fastapi>=0.115.0" \
+    "uvicorn>=0.30.0"
 
 COPY . .
 
-CMD ["python", "main.py"]
+# Cloud Run sets PORT; local `docker run -p 8080:8080` should pass -e PORT=8080
+CMD ["sh", "-c", "exec python -m uvicorn server:app --host 0.0.0.0 --port ${PORT:-8080}"]

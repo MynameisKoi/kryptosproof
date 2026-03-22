@@ -17,6 +17,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    # Image default CMD is the HTTP server for Cloud Run; locally we run the batch audit.
+    command: ["python", "main.py"]
     depends_on:
       - dvwa
     networks:
