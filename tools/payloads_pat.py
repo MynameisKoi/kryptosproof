@@ -7,6 +7,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from config import settings
+from tools.tool_logs import merge_tool_logs, with_logs
 
 
 def _root() -> Path:
@@ -27,12 +28,15 @@ def search_payload_files(keyword: str, *, max_results: int = 80) -> dict:
     """Find .txt files under the payload root whose path contains keyword (case-insensitive)."""
     root = _root()
     if not root.is_dir():
-        return {
-            "available": False,
-            "root": str(root),
-            "error": "PAYLOADS_ROOT does not exist — clone PayloadsAllTheThings (see project docs).",
-            "matches": [],
-        }
+        return with_logs(
+            {
+                "available": False,
+                "root": str(root),
+                "error": "PAYLOADS_ROOT does not exist — clone PayloadsAllTheThings (see project docs).",
+                "matches": [],
+            },
+            f"PAYLOADS_ROOT missing: {root}",
+        )
     kw = keyword.lower()
     matches: list[str] = []
     for p in root.rglob("*.txt"):
@@ -44,13 +48,19 @@ def search_payload_files(keyword: str, *, max_results: int = 80) -> dict:
             matches.append(str(rel).replace("\\", "/"))
             if len(matches) >= max_results:
                 break
-    return {
-        "available": True,
-        "root": str(root),
-        "keyword": keyword,
-        "matches": matches,
-        "truncated": len(matches) >= max_results,
-    }
+    return with_logs(
+        {
+            "available": True,
+            "root": str(root),
+            "keyword": keyword,
+            "matches": matches,
+            "truncated": len(matches) >= max_results,
+        },
+        merge_tool_logs(
+            f"pat_search keyword={keyword!r}",
+            f"matches: {len(matches)} path(s)" + (" (truncated)" if len(matches) >= max_results else ""),
+        ),
+    )
 
 
 def read_payload_lines(relative_path: str, *, max_lines: int = 60) -> dict:
@@ -59,15 +69,18 @@ def read_payload_lines(relative_path: str, *, max_lines: int = 60) -> dict:
     try:
         rel = _safe_relative(relative_path)
     except ValueError as e:
-        return {"available": False, "error": str(e), "lines": []}
+        return with_logs({"available": False, "error": str(e), "lines": []}, str(e))
     path = (root / rel).resolve()
     if not str(path).startswith(str(root)) or not path.is_file():
-        return {"available": False, "error": "file not found or outside payload root", "lines": []}
+        return with_logs(
+            {"available": False, "error": "file not found or outside payload root", "lines": []},
+            "file not found or outside payload root",
+        )
     lines: list[str] = []
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError as e:
-        return {"available": False, "error": str(e), "lines": []}
+        return with_logs({"available": False, "error": str(e), "lines": []}, str(e))
     for line in text.splitlines():
         s = line.strip()
         if not s or s.startswith("#"):
@@ -75,9 +88,15 @@ def read_payload_lines(relative_path: str, *, max_lines: int = 60) -> dict:
         lines.append(s[:500])
         if len(lines) >= max_lines:
             break
-    return {
-        "available": True,
-        "path": str(rel).replace("\\", "/"),
-        "lines": lines,
-        "truncated": len(lines) >= max_lines,
-    }
+    return with_logs(
+        {
+            "available": True,
+            "path": str(rel).replace("\\", "/"),
+            "lines": lines,
+            "truncated": len(lines) >= max_lines,
+        },
+        merge_tool_logs(
+            f"pat_read path={rel.as_posix()!r}",
+            f"lines returned: {len(lines)}" + (" (truncated)" if len(lines) >= max_lines else ""),
+        ),
+    )

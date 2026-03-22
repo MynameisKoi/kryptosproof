@@ -10,6 +10,7 @@ from typing import Any
 import httpx
 
 from config import settings
+from tools.tool_logs import merge_tool_logs, with_logs
 
 
 def _params() -> dict[str, str]:
@@ -31,15 +32,25 @@ async def _get(client: httpx.AsyncClient, path: str, **extra: str) -> dict[str, 
 
 async def zap_ping() -> dict[str, Any]:
     """Return ZAP version if the API is reachable."""
+    base = settings.zap_proxy_url
     try:
         async with httpx.AsyncClient() as client:
             data = await _get(client, "/JSON/core/view/version/")
     except (httpx.ConnectError, httpx.TimeoutException) as e:
-        return {"available": False, "error": str(e), "zap": None}
+        return with_logs(
+            {"available": False, "error": str(e), "zap": None},
+            f"zap_ping: cannot connect to {base}: {e}",
+        )
     if "_error" in data:
-        return {"available": False, "error": data.get("_error"), "zap": data}
+        return with_logs(
+            {"available": False, "error": data.get("_error"), "zap": data},
+            merge_tool_logs(f"zap_ping GET {base}", str(data.get("_error")), str(data.get("body", ""))[:1500]),
+        )
     ver = data.get("version")
-    return {"available": bool(ver), "version": ver, "zap": data}
+    return with_logs(
+        {"available": bool(ver), "version": ver, "zap": data},
+        merge_tool_logs(f"zap_ping: ZAP reachable at {base}", f"version={ver!r}"),
+    )
 
 
 async def zap_spider_and_alerts(target_url: str) -> dict[str, Any]:
@@ -49,12 +60,16 @@ async def zap_spider_and_alerts(target_url: str) -> dict[str, Any]:
     """
     ping = await zap_ping()
     if not ping.get("available"):
-        return {
-            "tool": "zap",
-            "available": False,
-            "error": ping.get("error") or "ZAP API not reachable — start ZAP on ZAP_PROXY_URL",
-            "alerts": [],
-        }
+        return with_logs(
+            {
+                "tool": "zap",
+                "available": False,
+                "error": ping.get("error") or "ZAP API not reachable — start ZAP on ZAP_PROXY_URL",
+                "alerts": [],
+            },
+            ping.get("logs", ""),
+            "zap_spider_and_alerts: ZAP not available",
+        )
 
     try:
         async with httpx.AsyncClient() as client:
@@ -62,16 +77,27 @@ async def zap_spider_and_alerts(target_url: str) -> dict[str, Any]:
             p = {**_params(), "url": target_url}
             r = await client.get(f"{base}/JSON/spider/action/scan/", params=p, timeout=60.0)
             if r.status_code != 200:
-                return {
-                    "tool": "zap",
-                    "available": True,
-                    "error": f"spider start failed: HTTP {r.status_code}",
-                    "alerts": [],
-                }
+                return with_logs(
+                    {
+                        "tool": "zap",
+                        "available": True,
+                        "error": f"spider start failed: HTTP {r.status_code}",
+                        "alerts": [],
+                    },
+                    f"spider scan HTTP {r.status_code}",
+                )
             start = r.json()
             scan_id = start.get("scan") or start.get("scanId")
             if scan_id is None:
-                return {"tool": "zap", "available": True, "error": f"unexpected spider response: {start}", "alerts": []}
+                return with_logs(
+                    {
+                        "tool": "zap",
+                        "available": True,
+                        "error": f"unexpected spider response: {start}",
+                        "alerts": [],
+                    },
+                    f"unexpected spider response: {start!r}",
+                )
 
             loop = asyncio.get_running_loop()
             deadline = loop.time() + settings.zap_spider_max_wait
@@ -95,16 +121,26 @@ async def zap_spider_and_alerts(target_url: str) -> dict[str, Any]:
                     alerts = aj.get("alerts", []) if isinstance(aj, dict) else []
                 except Exception:
                     pass
-            return {
-                "tool": "zap",
-                "available": True,
-                "target_url": target_url,
-                "spider_start": start,
-                "alerts": alerts[:200],
-                "alerts_truncated": len(alerts) > 200,
-            }
+            return with_logs(
+                {
+                    "tool": "zap",
+                    "available": True,
+                    "target_url": target_url,
+                    "spider_start": start,
+                    "alerts": alerts[:200],
+                    "alerts_truncated": len(alerts) > 200,
+                },
+                merge_tool_logs(
+                    f"zap spider+alerts target={target_url}",
+                    f"scan_id={scan_id!r}",
+                    f"alerts count: {len(alerts)} (returning up to 200)",
+                ),
+            )
     except (httpx.ConnectError, httpx.TimeoutException) as e:
-        return {"tool": "zap", "available": False, "error": str(e), "alerts": []}
+        return with_logs(
+            {"tool": "zap", "available": False, "error": str(e), "alerts": []},
+            f"zap_spider_and_alerts request error: {e}",
+        )
 
 
 async def zap_active_scan(target_url: str) -> dict[str, Any]:
@@ -113,7 +149,11 @@ async def zap_active_scan(target_url: str) -> dict[str, Any]:
     """
     ping = await zap_ping()
     if not ping.get("available"):
-        return {"tool": "zap", "available": False, "error": ping.get("error"), "status": None}
+        return with_logs(
+            {"tool": "zap", "available": False, "error": ping.get("error"), "status": None},
+            ping.get("logs", ""),
+            "zap_active_scan: ZAP not available",
+        )
 
     try:
         async with httpx.AsyncClient() as client:
@@ -124,12 +164,22 @@ async def zap_active_scan(target_url: str) -> dict[str, Any]:
                 timeout=60.0,
             )
             if r.status_code != 200:
-                return {
-                    "tool": "zap",
-                    "available": True,
-                    "error": f"active scan start failed: HTTP {r.status_code}",
-                    "status": None,
-                }
-            return {"tool": "zap", "available": True, "target_url": target_url, "active_scan": r.json()}
+                return with_logs(
+                    {
+                        "tool": "zap",
+                        "available": True,
+                        "error": f"active scan start failed: HTTP {r.status_code}",
+                        "status": None,
+                    },
+                    f"active scan HTTP {r.status_code}",
+                )
+            body = r.json()
+            return with_logs(
+                {"tool": "zap", "available": True, "target_url": target_url, "active_scan": body},
+                merge_tool_logs(f"zap_active_scan target={target_url}", f"response keys: {list(body) if isinstance(body, dict) else type(body)}"),
+            )
     except (httpx.ConnectError, httpx.TimeoutException) as e:
-        return {"tool": "zap", "available": False, "error": str(e), "status": None}
+        return with_logs(
+            {"tool": "zap", "available": False, "error": str(e), "status": None},
+            f"zap_active_scan: {e}",
+        )

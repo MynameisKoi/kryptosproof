@@ -10,6 +10,7 @@ from typing import Literal
 from config import settings
 from schemas import AttackScriptResult, ExecutionResult, SandboxInfo
 from tools.sandbox import SandboxResult, create_sandbox, destroy_sandbox, run_script_string
+from tools.tool_logs import merge_tool_logs
 
 
 def _truncate_output(text: str, max_chars: int) -> str:
@@ -82,6 +83,12 @@ def execution_result_from_sandbox(
     cap = settings.max_execution_output_chars
     out = _truncate_output(sr.stdout, cap)
     err = _truncate_output(sr.stderr, cap)
+    log_blob = merge_tool_logs(
+        f"run_attack_execution exit_code={sr.exit_code} crash_detected={sr.crash_detected} status={status}",
+        f"vulnerabilities_confirmed: {len(vulns)} — {vulns[:5]}",
+        "stdout:\n" + out[: min(8000, settings.max_execution_output_chars)],
+        "stderr:\n" + err[: min(8000, settings.max_execution_output_chars)],
+    )
     return ExecutionResult(
         attack_type=attack.vulnerability_type,
         target_url=target_url,
@@ -96,6 +103,7 @@ def execution_result_from_sandbox(
         crash_detected=sr.crash_detected,
         vulnerabilities_confirmed=vulns,
         error_logs=_trim_error_logs(err),
+        logs=log_blob,
         status=status,
         raw_responses=[],
     )

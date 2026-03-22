@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from config import settings
+from tools.tool_logs import logs_from_run_cmd, merge_tool_logs, with_logs
 
 
 def _project_root() -> Path:
@@ -43,25 +44,29 @@ async def _run_cmd(
         stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=timeout)
     except asyncio.TimeoutError:
         proc.kill()
-        return {
-            "ok": False,
-            "error": f"timeout after {timeout}s",
-            "command": cmd,
-            "exit_code": -1,
-            "stdout": "",
-            "stderr": "",
-        }
+        return with_logs(
+            {
+                "ok": False,
+                "error": f"timeout after {timeout}s",
+                "command": cmd,
+                "exit_code": -1,
+                "stdout": "",
+                "stderr": "",
+            },
+            f"subprocess timeout after {timeout}s",
+        )
 
     stdout = stdout_b.decode("utf-8", errors="replace")
     stderr = stderr_b.decode("utf-8", errors="replace")
     code = proc.returncode if proc.returncode is not None else -1
-    return {
+    base = {
         "ok": code == 0,
         "command": cmd,
         "exit_code": code,
         "stdout": stdout,
         "stderr": stderr,
     }
+    return with_logs(base, logs_from_run_cmd(base))
 
 
 def _parse_jsonl(text: str) -> list[dict[str, Any]]:
@@ -89,12 +94,15 @@ async def run_nuclei_scan(
     """
     exe = _which("nuclei")
     if not exe:
-        return {
-            "tool": "nuclei",
-            "available": False,
-            "error": "nuclei not found in PATH",
-            "findings": [],
-        }
+        return with_logs(
+            {
+                "tool": "nuclei",
+                "available": False,
+                "error": "nuclei not found in PATH",
+                "findings": [],
+            },
+            "nuclei not found in PATH",
+        )
 
     cmd = [
         exe,
@@ -113,17 +121,22 @@ async def run_nuclei_scan(
 
     raw = await _run_cmd(cmd, timeout=settings.red_team_nuclei_timeout)
     findings = _parse_jsonl(raw["stdout"])
-    return {
-        "tool": "nuclei",
-        "available": True,
-        "target_url": target_url,
-        "tags": tags,
-        "severity_filter": severity or "critical,high,medium,low",
-        "exit_code": raw["exit_code"],
-        "stderr": raw["stderr"][:8000],
-        "findings": findings[:200],
-        "findings_truncated": len(findings) > 200,
-    }
+    return with_logs(
+        {
+            "tool": "nuclei",
+            "available": True,
+            "target_url": target_url,
+            "tags": tags,
+            "severity_filter": severity or "critical,high,medium,low",
+            "exit_code": raw["exit_code"],
+            "stdout": raw["stdout"][:8000],
+            "stderr": raw["stderr"][:8000],
+            "findings": findings[:200],
+            "findings_truncated": len(findings) > 200,
+        },
+        raw.get("logs") or logs_from_run_cmd(raw),
+        f"nuclei JSONL lines parsed: {len(findings)} (returning up to 200)",
+    )
 
 
 async def run_ffuf_directory_fuzz(
@@ -137,21 +150,27 @@ async def run_ffuf_directory_fuzz(
     """
     exe = _which("ffuf")
     if not exe:
-        return {
-            "tool": "ffuf",
-            "available": False,
-            "error": "ffuf not found in PATH",
-            "results": [],
-        }
+        return with_logs(
+            {
+                "tool": "ffuf",
+                "available": False,
+                "error": "ffuf not found in PATH",
+                "results": [],
+            },
+            "ffuf not found in PATH",
+        )
 
     wl = Path(wordlist_path) if wordlist_path else _default_wordlist()
     if not wl.is_file():
-        return {
-            "tool": "ffuf",
-            "available": True,
-            "error": f"wordlist not found: {wl}",
-            "results": [],
-        }
+        return with_logs(
+            {
+                "tool": "ffuf",
+                "available": True,
+                "error": f"wordlist not found: {wl}",
+                "results": [],
+            },
+            f"wordlist not found: {wl}",
+        )
 
     base = base_url.rstrip("/")
     url = f"{base}/FUZZ"
@@ -184,16 +203,21 @@ async def run_ffuf_directory_fuzz(
         results = parsed.get("results") if isinstance(parsed, dict) else []
         if not isinstance(results, list):
             results = []
-        return {
-            "tool": "ffuf",
-            "available": True,
-            "target_url": url,
-            "wordlist": str(wl),
-            "exit_code": raw["exit_code"],
-            "stderr": raw["stderr"][:4000],
-            "results": results[:300],
-            "results_truncated": len(results) > 300,
-        }
+        return with_logs(
+            {
+                "tool": "ffuf",
+                "available": True,
+                "target_url": url,
+                "wordlist": str(wl),
+                "exit_code": raw["exit_code"],
+                "stdout": raw.get("stdout", "")[:4000],
+                "stderr": raw["stderr"][:4000],
+                "results": results[:300],
+                "results_truncated": len(results) > 300,
+            },
+            raw.get("logs") or logs_from_run_cmd(raw),
+            f"ffuf matches: {len(results)} (returning up to 300)",
+        )
     finally:
         try:
             os.unlink(out_path)
@@ -212,12 +236,15 @@ async def run_sqlmap_probe(
     """
     exe = _which("sqlmap")
     if not exe:
-        return {
-            "tool": "sqlmap",
-            "available": False,
-            "error": "sqlmap not found in PATH",
-            "summary": None,
-        }
+        return with_logs(
+            {
+                "tool": "sqlmap",
+                "available": False,
+                "error": "sqlmap not found in PATH",
+                "summary": None,
+            },
+            "sqlmap not found in PATH",
+        )
 
     cmd = [
         exe,
@@ -236,22 +263,28 @@ async def run_sqlmap_probe(
 
     raw = await _run_cmd(cmd, timeout=settings.red_team_sqlmap_timeout)
     out = raw["stdout"] + "\n" + raw["stderr"]
-    return {
-        "tool": "sqlmap",
-        "available": True,
-        "target_url": target_url,
-        "exit_code": raw["exit_code"],
-        "output_excerpt": out[:12000],
-        "likely_vulnerable": any(
-            s in out.lower()
-            for s in (
-                "is vulnerable",
-                "injectable",
-                "parameter: ",
-                "type: boolean-based",
-                "type: error-based",
-                "type: time-based",
-                "type: union query",
-            )
-        ),
-    }
+    return with_logs(
+        {
+            "tool": "sqlmap",
+            "available": True,
+            "target_url": target_url,
+            "exit_code": raw["exit_code"],
+            "stdout": raw["stdout"][:6000],
+            "stderr": raw["stderr"][:6000],
+            "output_excerpt": out[:12000],
+            "likely_vulnerable": any(
+                s in out.lower()
+                for s in (
+                    "is vulnerable",
+                    "injectable",
+                    "parameter: ",
+                    "type: boolean-based",
+                    "type: error-based",
+                    "type: time-based",
+                    "type: union query",
+                )
+            ),
+        },
+        raw.get("logs") or logs_from_run_cmd(raw),
+        "output_excerpt (combined stdout+stderr, truncated):\n" + out[:12000],
+    )
