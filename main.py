@@ -1,5 +1,5 @@
 """
-KryptoSproof — Automated Web Security Audit Platform
+KryptosProof — Automated Web Security Audit Platform
 Entry point: runs the full orchestrated red team → blue team cycle.
 """
 import asyncio
@@ -22,7 +22,7 @@ if settings.logfire_token:
 
 async def main():
     target = sys.argv[1] if len(sys.argv) > 1 else settings.target_url
-    print(f"[*] KryptoSproof starting audit against: {target}\n")
+    print(f"[*] KryptosProof starting audit against: {target}\n")
 
     report = await run_audit(target)
 
