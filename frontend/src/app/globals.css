@@ -1,0 +1,145 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Dark theme (default) ───────────────────────────────── */
+:root,
+[data-theme="dark"] {
+  --bg-primary: #080810;
+  --bg-secondary: #0d0d1a;
+  --bg-surface: #12122a;
+  --bg-elevated: #1a1a35;
+
+  --border: #1e1e3a;
+  --border-muted: #16162e;
+  --border-glow: #2d2d60;
+
+  --fg-base: #e2e8f0;
+  --fg-muted: #94a3b8;
+  --fg-subtle: #64748b;
+  --fg-faint: #3d4e63;
+
+  --grid-line: rgba(30, 30, 58, 0.35);
+
+  --scrollbar-bg: #0d0d1a;
+  --scrollbar-thumb: #1e1e3a;
+  --scrollbar-thumb-hover: #2d2d60;
+}
+
+/* ─── Light theme ────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-primary: #f1f5f9;
+  --bg-secondary: #e8edf5;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f8fafc;
+
+  --border: #e2e8f0;
+  --border-muted: #cbd5e1;
+  --border-glow: #94a3b8;
+
+  --fg-base: #0f172a;
+  --fg-muted: #334155;
+  --fg-subtle: #64748b;
+  --fg-faint: #94a3b8;
+
+  --grid-line: rgba(148, 163, 184, 0.25);
+
+  --scrollbar-bg: #e8edf5;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-bg);
+}
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-track { background: var(--scrollbar-bg); }
+*::-webkit-scrollbar-thumb { background-color: var(--scrollbar-thumb); border-radius: 3px; }
+*::-webkit-scrollbar-thumb:hover { background-color: var(--scrollbar-thumb-hover); }
+
+/* ─── Base ───────────────────────────────────────────────── */
+html, body {
+  background-color: var(--bg-primary);
+  color: var(--fg-base);
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* ─── Grid background ────────────────────────────────────── */
+.bg-grid {
+  background-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* ─── Terminal text ──────────────────────────────────────── */
+.terminal-text {
+  font-family: "JetBrains Mono", monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ─── Scan line overlay ──────────────────────────────────── */
+.scan-line-overlay { position: relative; overflow: hidden; }
+.scan-line-overlay::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(transparent, rgba(59, 130, 246, 0.12), transparent);
+  animation: scan-line 4s linear infinite;
+  pointer-events: none;
+}
+
+/* ─── Glow helpers ───────────────────────────────────────── */
+.glow-red   { box-shadow: 0 0 12px rgba(239, 68,  68,  0.3); }
+.glow-blue  { box-shadow: 0 0 12px rgba(59,  130, 246, 0.3); }
+.glow-green { box-shadow: 0 0 12px rgba(16,  185, 129, 0.3); }
+
+/* ─── Blinking cursor ────────────────────────────────────── */
+.cursor::after {
+  content: "█";
+  animation: blink 1s step-end infinite;
+}
+
+/* ─── Progress bar shimmer ───────────────────────────────── */
+.progress-bar {
+  position: relative;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+/* ─── Keyframes ──────────────────────────────────────────── */
+@keyframes scan-line {
+  0%   { transform: translateY(-2px); }
+  100% { transform: translateY(100vh); }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slideUp {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
