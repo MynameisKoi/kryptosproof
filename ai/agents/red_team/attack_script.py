@@ -25,12 +25,10 @@ class AttackScriptDeps:
 
 
 attack_script_agent = Agent(
-    model="anthropic:claude-opus-4-6",
+    model=settings.model,
     deps_type=AttackScriptDeps,
     output_type=AttackScriptResult,
     system_prompt=_PROMPT,
-    retries=settings.attack_output_retries,
-    output_retries=settings.attack_output_retries,
 )
 
 
@@ -44,26 +42,26 @@ def validate_attack_output(ctx: RunContext[AttackScriptDeps], data: AttackScript
 
 
 @attack_script_agent.tool
-async def probe_target_endpoints(ctx: RunContext[AttackScriptDeps]) -> list[dict]:
-    """Probe common endpoints on the target and return their status/headers."""
+async def probe_target_endpoints(ctx: RunContext[AttackScriptDeps]) -> dict:
+    """Probe common endpoints on the target; result includes `endpoints` and human-readable `logs`."""
     return await probe_endpoints(ctx.deps.target_url)
 
 
 @attack_script_agent.tool
 async def check_security_headers(ctx: RunContext[AttackScriptDeps]) -> dict:
-    """Return security-relevant HTTP response headers for the target."""
+    """Return security-relevant HTTP response headers for the target plus `logs`."""
     return await get_security_headers(ctx.deps.target_url)
 
 
 @attack_script_agent.tool
 async def detect_target_technologies(ctx: RunContext[AttackScriptDeps]) -> dict:
-    """Detect server technology and frameworks used by the target."""
+    """Detect server technology and frameworks used by the target; includes `logs`."""
     return await detect_technologies(ctx.deps.target_url)
 
 
 @attack_script_agent.tool
-async def extract_forms(ctx: RunContext[AttackScriptDeps], path: str = "/") -> list[dict]:
-    """Extract HTML forms from a specific path on the target (useful for CSRF/injection)."""
+async def extract_forms(ctx: RunContext[AttackScriptDeps], path: str = "/") -> dict:
+    """Extract HTML forms from a path; result includes `forms` and `logs`."""
     url = ctx.deps.target_url.rstrip("/") + path
     return await get_forms(url)
 

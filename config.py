@@ -1,6 +1,7 @@
-from typing import Literal
+import os
+from typing import Literal, Self
 
-from pydantic import Field
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,9 +12,30 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # LLM (optional env overrides; agents may still use a fixed provider string)
-    open_ai_api: str = Field(default="", description="Optional API key for Google AI if used")
-    model: str = Field(default="anthropic:claude-opus-4-6")
+    # LLM — MODEL / AI_MODEL set the pydantic-ai model id; Gemini auth from any of these env names
+    model: str = Field(
+        default="anthropic:claude-opus-4-6",
+        validation_alias=AliasChoices("MODEL", "AI_MODEL"),
+    )
+    gemini_api_key: str = Field(
+        default="",
+        description="Gemini / Google AI Studio API key (pydantic-ai reads GEMINI_API_KEY from the environment).",
+        validation_alias=AliasChoices("GEMINI_API_KEY", "GOOGLE_AI_API", "GOOGLE_API_KEY"),
+    )
+
+    @model_validator(mode="after")
+    def normalize_model_and_sync_gemini_env(self) -> Self:
+        """Bare gemini-* ids become google-gla:…; mirror GOOGLE_AI_API / gemini key into GEMINI_API_KEY for the SDK."""
+        m = self.model.strip()
+        if not m:
+            self.model = "anthropic:claude-opus-4-6"
+        elif ":" not in m and m.lower().startswith("gemini"):
+            self.model = f"google-gla:{m}"
+
+        key = self.gemini_api_key.strip()
+        if key:
+            os.environ.setdefault("GEMINI_API_KEY", key)
+        return self
 
     # Target
     target_url: str = "http://dvwa:80"
