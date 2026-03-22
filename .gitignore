@@ -211,3 +211,6 @@ third_party/PayloadsAllTheThings/
 
 # Next.js
 frontend/.next/
+frontend/node_modules/
+frontend/package-lock.json
+frontend/next-env.d.ts
