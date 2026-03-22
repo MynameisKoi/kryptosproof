@@ -1,34 +1,20 @@
-# Red Team — Execution Agent
+# Red Team — Execution (deterministic)
 
-You are the execution specialist responsible for running attack scripts inside an isolated sandbox environment.
+Attack scripts are **not** interpreted by an LLM. The platform runs them in Docker and builds `ExecutionResult` from real telemetry.
 
-## Your Role
-You receive an `AttackScriptResult` and execute its Python script in a Docker sandbox container connected to the target web application network.
+## Pipeline (`run_attack_execution`)
 
-## Execution Tools Available
-- `create_sandbox(image, network)` — spin up an isolated Docker container
-- `run_script_string(container_id, script)` — execute the attack script
-- `destroy_sandbox(container_id)` — clean up after execution
+1. **Create** a container on `SANDBOX_NETWORK` using `SANDBOX_IMAGE` (default `python:3.11-slim`).
+2. **Install** `httpx` in the container.
+3. **Write** `/tmp/script.py` via Docker `put_archive` (tar — no shell quoting limits).
+4. **Run** `python /tmp/script.py` with `SANDBOX_TIMEOUT`.
+5. **Destroy** the container.
+6. **Build** `ExecutionResult`:
+   - **`vulnerabilities_confirmed`**: lines containing `[VULN]`; if none, substring matches against `expected_indicators` from the attack result.
+   - **`status`**: `exploited` (findings, clean stderr), `partial` (findings + crash noise), `failed` (clean run, no findings), `error` (crash / non‑zero exit, no confirmed findings).
+   - **`crash_detected`**: non‑zero exit or stderr containing error/traceback/segfault patterns.
+   - **`error_logs`**: trimmed stderr for blue team.
 
-## Execution Flow
-1. Create a sandbox container on the `kryptosproof_sandbox` network.
-2. Run the attack script inside it (the sandbox can reach the target app via Docker networking).
-3. Capture stdout, stderr, and exit code.
-4. Detect crashes and confirmed exploitation indicators.
-5. Destroy the sandbox.
+## Script contract
 
-## Analyzing Results
-Scan stdout for `[VULN]` markers to confirm vulnerabilities.
-Scan stderr for crash/error patterns.
-
-Mark `crash_detected = True` if:
-- Exit code is non-zero
-- stderr contains: "error", "exception", "traceback", "crash", "segfault"
-
-Mark a vulnerability as confirmed if:
-- The script printed `[VULN]` for that check
-- The response contained the expected exploitation indicator
-
-## Output
-Return an `ExecutionResult` with full logs, confirmed vulnerabilities list, and parsed error logs for blue team use.
-The `error_logs` field should contain only the relevant lines — not the full raw output.
+Attack scripts should print `[VULN] ...` when a check succeeds (see Attack Script Agent prompt).

@@ -16,9 +16,11 @@ from schemas import (
     SecurityAuditReport,
 )
 from ai.agents.red_team.attack_script import attack_script_agent, AttackScriptDeps
-from ai.agents.red_team.execution import execution_agent, ExecutionDeps
+from tools.attack_validation import AttackScriptValidationError, validate_attack_script_result
+from tools.execution_pipeline import run_attack_execution
 from ai.agents.blue_team.fix_script import fix_script_agent, FixScriptDeps
 from ai.agents.blue_team.testing import testing_agent, TestingDeps
+from config import settings
 
 _PROMPT = (Path(__file__).parent.parent / "prompt" / "orchestrator.md").read_text()
 
@@ -31,7 +33,7 @@ class OrchestratorDeps:
 orchestrator_agent = Agent(
     model="anthropic:claude-opus-4-6",
     deps_type=OrchestratorDeps,
-    result_type=SecurityAuditReport,
+    output_type=SecurityAuditReport,
     system_prompt=_PROMPT,
 )
 
@@ -49,14 +51,15 @@ async def run_red_team(ctx: RunContext[OrchestratorDeps], vulnerability_focus: s
         f"Generate a {vulnerability_focus} attack script for target: {target_url}",
         deps=AttackScriptDeps(target_url=target_url),
     )
-    attack: AttackScriptResult = attack_result.data
+    attack: AttackScriptResult = attack_result.output
 
-    # Step 2: Execute in sandbox
-    exec_result = await execution_agent.run(
-        f"Execute this {attack.vulnerability_type} attack script against {target_url}",
-        deps=ExecutionDeps(attack_script=attack, target_url=target_url),
-    )
-    execution: ExecutionResult = exec_result.data
+    try:
+        validate_attack_script_result(attack, target_url)
+    except AttackScriptValidationError as e:
+        raise RuntimeError(f"Attack script failed final validation: {e}") from e
+
+    # Step 2: Execute in sandbox (deterministic — no LLM)
+    execution: ExecutionResult = await run_attack_execution(attack, target_url)
 
     # Attach the attack script to the execution result for blue team use
     execution_dict = execution.model_dump()
@@ -81,9 +84,12 @@ async def run_blue_team(ctx: RunContext[OrchestratorDeps], execution_result_json
     # Step 1: Generate fix
     fix_result = await fix_script_agent.run(
         f"Generate fixes for confirmed vulnerabilities: {execution.vulnerabilities_confirmed}",
-        deps=FixScriptDeps(execution_result=execution),
+        deps=FixScriptDeps(
+            execution_result=execution,
+            source_repo_path=settings.source_repo_path,
+        ),
     )
-    fix: FixScriptResult = fix_result.data
+    fix: FixScriptResult = fix_result.output
 
     # Step 2: Verify fix (re-run attack)
     if attack:
@@ -95,7 +101,7 @@ async def run_blue_team(ctx: RunContext[OrchestratorDeps], execution_result_json
                 target_url=target_url,
             ),
         )
-        test: TestResult = test_result.data
+        test: TestResult = test_result.output
     else:
         # No attack script available — create a minimal test result
         test = TestResult(
@@ -123,4 +129,4 @@ async def run_audit(target_url: str) -> SecurityAuditReport:
         "After red team, apply blue team fixes and verify each vulnerability is patched.",
         deps=OrchestratorDeps(target_url=target_url),
     )
-    return result.data
+    return result.output

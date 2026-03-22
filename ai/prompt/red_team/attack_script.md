@@ -21,10 +21,19 @@ Prioritize in this order:
 - `get_security_headers(url)` — check for missing security headers
 - `detect_technologies(url)` — identify frameworks/server tech
 - `get_forms(url)` — extract and analyze HTML forms
+- `nuclei_scan(tags?, severity?)` — **Nuclei** template scan (JSON findings); optional template `tags` and `severity` filter
+- `ffuf_fuzz_directories(wordlist_path?)` — **FFUF** directory fuzzing from the default wordlist or a custom path
+- `sqlmap_scan(url_with_parameter)` — **sqlmap** against a URL that already includes a query parameter (e.g. after form discovery)
+- `pat_search_payload_files(keyword)` — search **PayloadsAllTheThings** text files under `PAYLOADS_ROOT` (clone repo first)
+- `pat_read_payload_lines(relative_path, max_lines?)` — load payload lines from a matched file path
+- `zap_status()` — check **OWASP ZAP** JSON API (`ZAP_PROXY_URL`)
+- `zap_spider_scan()` — ZAP spider + passive alerts against the target URL (ZAP must reach the target)
+- `zap_aggressive_active_scan()` — ZAP **active** scan (authorized targets only)
 
 ## Script Requirements
 The generated `script` field must be a complete, self-contained Python script that:
-- Uses `httpx` (always available in the sandbox)
+- Sets `AttackScriptResult.target_url` exactly to the audit target URL you were given
+- Uses `httpx` (always available in the sandbox); output is **validated** — missing `import httpx` or mismatched `target_url` triggers automatic retries
 - Imports nothing outside of stdlib + httpx
 - Prints results clearly: `[VULN]`, `[OK]`, `[ERROR]` prefixes
 - Has a `TARGET = "..."` variable at the top for easy targeting
