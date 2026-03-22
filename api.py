@@ -25,9 +25,6 @@ if settings.logfire_token:
     )
     logfire.instrument_pydantic_ai()
 
-from ai.agents.orchestrator import OrchestratorDeps, orchestrator_agent  # noqa: E402
-from schemas import SecurityAuditReport  # noqa: E402
-
 app = FastAPI(title="KryptoSproof API")
 
 app.add_middleware(
@@ -105,7 +102,7 @@ def _append_phase_output(audit: dict, phase_id: str, text: str) -> None:
             break
 
 
-def _map_report_to_audit(audit: dict, report: SecurityAuditReport) -> None:
+def _map_report_to_audit(audit: dict, report: Any) -> None:
     """Populate audit summary fields from the final SecurityAuditReport.
     Vulnerabilities are frozen after phase 2 — we never overwrite them here."""
     audit["totalVulnerabilities"] = report.total_vulnerabilities
@@ -115,6 +112,9 @@ def _map_report_to_audit(audit: dict, report: SecurityAuditReport) -> None:
 
 
 async def _run_audit_task(audit_id: str) -> None:
+    from ai.agents.orchestrator import OrchestratorDeps, orchestrator_agent
+    from schemas import SecurityAuditReport
+
     audit = _audits[audit_id]
     audit["status"] = "running"
     target_url = audit["targetUrl"]
